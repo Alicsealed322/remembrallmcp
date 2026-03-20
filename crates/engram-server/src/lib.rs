@@ -155,7 +155,7 @@ impl EngramServer {
             .unwrap_or_default();
 
         let mut contradiction_list: Vec<serde_json::Value> = Vec::new();
-        for (dupe_id, similarity) in &near_dupes {
+        for (dupe_id, similarity) in near_dupes.iter().take(3) {
             if let Ok(mem) = self.memory.get_readonly(*dupe_id).await {
                 contradiction_list.push(json!({
                     "id": mem.id.to_string(),
@@ -167,6 +167,9 @@ impl EngramServer {
         }
 
         let identifier = source_identifier.unwrap_or_else(|| "mcp".to_string());
+
+        // Capture length before `content` is moved into `CreateMemory`.
+        let content_len = content.len();
 
         let input = CreateMemory {
             content,
@@ -197,6 +200,14 @@ impl EngramServer {
         let mut response = json!({ "id": id.to_string(), "stored": true });
         if !contradiction_list.is_empty() {
             response["contradictions"] = json!(contradiction_list);
+        }
+        // Inform the caller when content is large enough that the embedding only
+        // covers the first ~500 words (model token limit). We still store the full
+        // text; only semantic search fidelity is affected.
+        if content_len > 2000 {
+            response["note"] = json!(
+                "Content exceeds 2000 characters. The semantic search embedding represents only the first ~500 words."
+            );
         }
 
         let text = response.to_string();
@@ -383,6 +394,7 @@ impl EngramServer {
             "files_skipped": index_result.files_skipped,
             "symbols_stored": symbols_stored,
             "relationships_stored": relationships_stored,
+            "note": "Indexing complete. Impact analysis results will reflect the updated graph.",
         })
         .to_string();
 
@@ -413,6 +425,20 @@ impl EngramServer {
         &self,
         Parameters(RecallParams { query, limit, memory_types, tags, project }): Parameters<RecallParams>,
     ) -> Result<CallToolResult, McpError> {
+        // Guard: reject empty or whitespace-only queries before touching the DB or
+        // embedding model. `plainto_tsquery('')` fails in Postgres, and an empty
+        // string produces a meaningless embedding.
+        if query.trim().is_empty() {
+            let text = json!({
+                "query": "",
+                "total_results": 0,
+                "results": [],
+                "suggestion": "Please provide a search query."
+            })
+            .to_string();
+            return Ok(CallToolResult::success(vec![Content::text(text)]));
+        }
+
         let limit = limit.unwrap_or(10).min(25).max(1);
 
         // Parse comma-separated memory type filter.
@@ -537,12 +563,21 @@ impl ServerHandler for EngramServer {
 impl EngramServer {
     /// Build from explicit parameters.
     pub async fn from_config(database_url: &str, schema: &str) -> anyhow::Result<Self> {
-        tracing::info!("Connecting to database: {database_url}");
+        // Strip credentials from the URL before logging so passwords don't leak.
+        let safe_url = database_url.split('@').last().unwrap_or("<url>");
+        tracing::info!("Connecting to database: {safe_url}");
 
         let pool = PgPoolOptions::new()
             .max_connections(10)
+            .acquire_timeout(std::time::Duration::from_secs(5))
             .connect(database_url)
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!(
+                "Cannot connect to database at {}. Is Postgres running? \
+                 Try 'engram doctor' to diagnose.\nError: {}",
+                safe_url,
+                e
+            ))?;
 
         let memory = Arc::new(MemoryStore::new(pool.clone(), schema.to_string()));
         let graph = Arc::new(GraphStore::new(pool.clone(), schema.to_string()));
