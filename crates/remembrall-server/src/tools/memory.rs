@@ -220,7 +220,10 @@ pub async fn recall_impl(
         .iter()
         .map(|r| {
             let content = if r.memory.content.len() > 2000 {
-                let end = r.memory.content.floor_char_boundary(2000);
+                let mut end = 2000;
+                while !r.memory.content.is_char_boundary(end) {
+                    end -= 1;
+                }
                 format!("{}...[truncated]", &r.memory.content[..end])
             } else {
                 r.memory.content.clone()
