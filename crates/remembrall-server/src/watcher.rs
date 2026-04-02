@@ -88,7 +88,7 @@ impl FileWatcher {
     /// Start the event loop. Runs until the process exits or the future is
     /// cancelled. Should be spawned as a background task.
     ///
-    /// ```no_run
+    /// ```ignore
     /// tokio::spawn(watcher.run());
     /// ```
     pub async fn run(self) {
