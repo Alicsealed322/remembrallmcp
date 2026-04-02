@@ -62,7 +62,28 @@ Run the benchmarks yourself: see [`benchmarks/`](benchmarks/) for the harness an
 
 ## Quick Start
 
-### Option 1: Download prebuilt binary (fastest)
+### Option 1: Docker Compose (easiest)
+
+```bash
+git clone https://github.com/cdnsteve/remembrallmcp.git
+cd remembrallmcp
+
+# Start Postgres + initialize schema + download embedding model
+docker compose up -d
+
+# Verify it's running
+docker compose exec remembrall remembrall status
+```
+
+That's it. Postgres with pgvector, the schema, and the embedding model are all set up automatically. The database and model cache persist across restarts.
+
+To run the MCP server:
+
+```bash
+docker compose run --rm remembrall
+```
+
+### Option 2: Download prebuilt binary
 
 ```bash
 # macOS (Apple Silicon)
@@ -76,27 +97,18 @@ sudo mv remembrall /usr/local/bin/
 # Linux (x86_64)
 curl -fsSL https://github.com/cdnsteve/remembrallmcp/releases/latest/download/remembrall-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv remembrall /usr/local/bin/
+
+# Initialize (sets up Postgres via Docker, creates schema, downloads model)
+remembrall init
 ```
 
-### Option 2: Build from source (requires Rust 1.94+)
+### Option 3: Build from source (requires Rust 1.94+)
 
 ```bash
 cargo build -p remembrall-server --release
 # Binary is at target/release/remembrall
-```
 
-### Initialize
-
-```bash
 remembrall init
-```
-
-This sets up a Docker-managed Postgres container with pgvector, creates the schema, and pre-downloads the embedding model (~23 MB). Config is written to `~/.remembrall/config.toml`.
-
-To use an existing Postgres instead:
-
-```bash
-remembrall init --database-url postgres://user:pass@host/dbname
 ```
 
 ### Connect to your MCP client

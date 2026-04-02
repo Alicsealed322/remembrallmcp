@@ -1,0 +1,39 @@
+services:
+  db:
+    image: pgvector/pgvector:0.8.2-pg16
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5450:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: remembrall
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d remembrall"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  remembrall:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/remembrall
+    volumes:
+      # Persists config (~/.remembrall/config.toml) and embedding model cache
+      - remembrall_home:/home/remembrall
+    # MCP uses stdio - keep stdin open
+    stdin_open: true
+    tty: true
+    # Run init on first launch to create schema and download embedding model
+    command: ["init", "--database-url", "postgres://postgres:postgres@db:5432/remembrall"]
+
+volumes:
+  db_data:
+  remembrall_home:
