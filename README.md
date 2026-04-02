@@ -90,10 +90,6 @@ docker compose run --rm remembrall
 curl -fsSL https://github.com/cdnsteve/remembrallmcp/releases/latest/download/remembrall-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv remembrall /usr/local/bin/
 
-# macOS (Intel)
-curl -fsSL https://github.com/cdnsteve/remembrallmcp/releases/latest/download/remembrall-x86_64-apple-darwin.tar.gz | tar xz
-sudo mv remembrall /usr/local/bin/
-
 # Linux (x86_64)
 curl -fsSL https://github.com/cdnsteve/remembrallmcp/releases/latest/download/remembrall-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv remembrall /usr/local/bin/
@@ -113,7 +109,9 @@ remembrall init
 
 ### Connect to your MCP client
 
-Add to your project's `.mcp.json` (works with Claude Code, Cursor, and any MCP-compatible client):
+Add to your project's `.mcp.json` (works with Claude Code, Cursor, and any MCP-compatible client).
+
+**If using a prebuilt binary or built from source:**
 
 ```json
 {
@@ -125,7 +123,20 @@ Add to your project's `.mcp.json` (works with Claude Code, Cursor, and any MCP-c
 }
 ```
 
-If running from source (not installed to PATH):
+**If using Docker Compose:**
+
+```json
+{
+  "mcpServers": {
+    "remembrall": {
+      "command": "docker",
+      "args": ["compose", "-f", "/path/to/remembrallmcp/docker-compose.yml", "run", "--rm", "-T", "remembrall"]
+    }
+  }
+}
+```
+
+**If running from source (not installed to PATH):**
 
 ```json
 {
