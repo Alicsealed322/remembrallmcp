@@ -116,6 +116,65 @@ dist/                    # Prebuilt release binaries
 - **Contradiction detection:** `remembrall_store` searches at 0.75 similarity before storing; near-duplicates are returned in the response
 - **Ingestion:** `remembrall_ingest_github` shells to `gh` CLI; `remembrall_ingest_docs` walks directories for `.md` files, splits on H2 headers
 
+## Branching & Releases
+
+Gitflow model:
+- `develop` - default branch, all PRs target here
+- `main` - releases only, merges from develop
+- `feature/*` - feature branches off develop
+- `hotfix/*` - urgent fixes off main
+
+### Cutting a release
+
+```bash
+# 1. Ensure develop is clean and CI passes
+git checkout develop
+cargo test --workspace
+
+# 2. Merge to main
+git checkout main
+git merge develop
+git push origin main
+
+# 3. Tag and push (triggers release pipeline)
+git tag v0.X.0
+git push origin v0.X.0
+
+# 4. Bump develop to next dev version
+git checkout develop
+# Update version in Cargo.toml if needed
+```
+
+### What the release pipeline does (on v* tag)
+
+1. Builds macOS arm64 + Linux x86_64 release binaries
+2. Creates GitHub Release with downloadable tarballs
+3. Publishes `remembrall-core` + `remembrall-server` to crates.io
+4. Builds and pushes Docker image to `cdnsteve/remembrallmcp:<version>` + `:latest`
+
+### Required GitHub secrets
+
+| Secret | Source |
+|---|---|
+| `CARGO_REGISTRY_TOKEN` | https://crates.io/settings/tokens |
+| `DOCKERHUB_USERNAME` | `cdnsteve` |
+| `DOCKERHUB_TOKEN` | https://hub.docker.com/settings/security |
+
+### Package registries
+
+| Registry | Package | URL |
+|---|---|---|
+| GitHub | cdnsteve/remembrallmcp | https://github.com/cdnsteve/remembrallmcp |
+| crates.io | remembrall-core | https://crates.io/crates/remembrall-core |
+| crates.io | remembrall-server | https://crates.io/crates/remembrall-server |
+| npm | remembrallmcp | https://www.npmjs.com/package/remembrallmcp |
+| PyPI | remembrallmcp | https://pypi.org/project/remembrallmcp |
+| Docker Hub | cdnsteve/remembrallmcp | https://hub.docker.com/r/cdnsteve/remembrallmcp |
+
+### Version numbering
+
+`remembrall-core` and `remembrall-server` share a version via `[workspace.package]` in the root `Cargo.toml`. Bump it there, not in individual crate Cargo.tomls. The `remembrall-server` dependency on `remembrall-core` must be pinned to the exact version (`version = "=X.Y.Z"`).
+
 ## Conventions
 
 - No `unwrap()` in library code - use `Result<T>` with `thiserror`/`anyhow`
