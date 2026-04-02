@@ -81,9 +81,12 @@ crates/
     config.rs            # Config from env vars
     embed.rs             # Embedder trait + FastEmbedder (fastembed/ONNX, 384-dim)
     search.rs            # Hybrid search stub (logic lives in memory/store.rs)
-    ingest.rs            # Ingestion stub (logic lives in remembrall-server/src/lib.rs)
+    ingest.rs            # GitHub PR and markdown docs ingestion (reusable without MCP)
   remembrall-server/
-    src/lib.rs           # MCP server - 9 tools
+    src/lib.rs           # MCP server - RemembrallServer struct + thin #[tool] wrappers
+    src/tools/memory.rs  # Store, recall, update, delete implementation
+    src/tools/graph.rs   # Index, impact, lookup_symbol implementation
+    src/tools/ingest.rs  # GitHub and docs ingestion tool wrappers
     src/main.rs          # CLI entry point (init, serve, start, stop, status, doctor, reset, version)
     src/config.rs        # RemembrallConfig - loads ~/.remembrall/config.toml with env var overrides
   remembrall-python/         # PyO3 bindings (deferred)
@@ -120,4 +123,6 @@ dist/                    # Prebuilt release binaries
 - Schema name is never hardcoded - always use `self.schema` with format strings
 - Spike binaries (`src/bin/spike*.rs`) are throwaway validation code, not production
 - Tree-sitter parsing is all Rust - no Python in the pipeline
-- Ingestion tool logic (GitHub, docs) lives in `remembrall-server/src/lib.rs` as MCP tool implementations, not in `remembrall-core/src/ingest.rs` (that file is a stub)
+- Ingestion logic (GitHub PRs, markdown docs) lives in `remembrall-core/src/ingest.rs` - reusable without MCP. Server tools are thin wrappers.
+- MCP tool implementations use a delegation pattern: `#[tool]` methods in `lib.rs` call `*_impl()` functions in `tools/` modules
+- `supported_extensions()` in `indexer.rs` is the single source of truth for all 13 supported file extensions
