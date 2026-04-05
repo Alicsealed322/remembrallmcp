@@ -24,13 +24,9 @@ use walkdir::WalkDir;
 
 use crate::graph::layers::detect_layer;
 use crate::graph::types::{RelationType, Relationship, Symbol, SymbolType};
-use crate::parser::go::parse_go_file;
-use crate::parser::java::parse_java_file;
-use crate::parser::kotlin::parse_kotlin_file;
-use crate::parser::python::{parse_python_file, resolve_python_import, FileParseResult, RawImport};
-use crate::parser::ruby::parse_ruby_file;
-use crate::parser::rust::parse_rust_file;
-use crate::parser::typescript::{parse_ts_file, TsLang};
+use crate::indexer::supported_extensions;
+use crate::parser::python::{resolve_python_import, RawImport};
+use crate::parser::{parse_file, FileParseResult};
 
 /// Combined output from indexing a directory.
 #[derive(Debug, Default)]
@@ -85,19 +81,8 @@ pub fn index_directory(
             .unwrap_or("")
             .to_lowercase();
 
-        // NOTE: This per-extension dispatch is intentionally duplicated from
-        // `crate::indexer::supported_extensions`. If you add a new language,
-        // update `supported_extensions()` in indexer.rs first, then mirror it
-        // here. A future refactor should consolidate these two dispatch paths.
-        let is_python = ext == "py";
-        let is_rust = ext == "rs";
-        let is_ruby = ext == "rb";
-        let is_go = ext == "go";
-        let is_java = ext == "java";
-        let is_kotlin = ext == "kt" || ext == "kts";
-        let ts_lang = TsLang::from_extension(&ext);
-
-        if !is_python && !is_rust && !is_ruby && !is_go && !is_java && !is_kotlin && ts_lang.is_none() {
+        // Check against the single authoritative extension list in indexer.rs.
+        if !supported_extensions().contains(&ext.as_str()) {
             continue;
         }
 
@@ -121,21 +106,14 @@ pub fn index_directory(
 
         let file_path = path.to_string_lossy().to_string();
 
-        let file_result: FileParseResult = if is_python {
-            parse_python_file(&file_path, &source, project, mtime)
-        } else if is_rust {
-            parse_rust_file(&file_path, &source, project, mtime)
-        } else if is_ruby {
-            parse_ruby_file(&file_path, &source, project, mtime)
-        } else if is_go {
-            parse_go_file(&file_path, &source, project, mtime)
-        } else if is_java {
-            parse_java_file(&file_path, &source, project, mtime)
-        } else if is_kotlin {
-            parse_kotlin_file(&file_path, &source, project, mtime)
-        } else {
-            let lang = ts_lang.unwrap();
-            parse_ts_file(&file_path, &source, project, mtime, lang)
+        // Dispatch to the correct parser via the central registry in parser/mod.rs.
+        // If the extension somehow slipped through but has no parser, skip the file.
+        let file_result: FileParseResult = match parse_file(&ext, &file_path, &source, project, mtime) {
+            Some(r) => r,
+            None => {
+                tracing::warn!("no parser for extension '{ext}' in {file_path}");
+                continue;
+            }
         };
 
         result.files_parsed += 1;

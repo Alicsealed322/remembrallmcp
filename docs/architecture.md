@@ -1,6 +1,6 @@
 # RemembrallMCP Architecture
 
-*Last updated: March 2026*
+*Last updated: April 2026*
 
 ## What is RemembrallMCP?
 
@@ -42,7 +42,8 @@ Source Code                   Organizational Knowledge
 |                           remembrall.relationships    |
 |  remembrall.file_index        - source -> target      |
 |  - mtime tracking         - Calls, Imports,       |
-|  - incremental reindex      Defines, Inherits     |
+|  - incremental reindex      Defines, Inherits,    |
+|                               UsesType             |
 |                           - confidence scoring    |
 +-------------------------+------------------------+
                           |
@@ -69,6 +70,9 @@ Source Code                   Organizational Knowledge
 remembrallmcp/
   Cargo.toml                    # Workspace root
   install.sh                    # curl installer script
+  Dockerfile                    # Single-container build (server + embedded ONNX)
+  docker-compose.yml            # One-command setup: server + Postgres/pgvector
+  benchmarks/                   # A/B benchmark harness
   crates/
     remembrall-core/                # Library - all logic lives here
       src/
@@ -93,8 +97,10 @@ remembrallmcp/
           kotlin.rs             # Tree-sitter Kotlin parser
           walker.rs             # Directory walker + two-phase cross-file resolution
         indexer.rs              # Incremental indexer with mtime tracking + CodeParser trait
+                                #   supported_extensions() is the single source of truth
+                                #   for all 13 supported file extensions across 8 languages
         search.rs               # Hybrid search stub
-        ingest.rs               # Ingestion stub
+        ingest.rs               # Ingestion logic: GitHub PR import + markdown doc ingestion
       src/bin/
         spike.rs                # Spike 1: memory + graph benchmarks
         spike2.rs               # Spike 2: multi-project regex indexing
@@ -103,10 +109,16 @@ remembrallmcp/
         kt_ast_debug.rs         # Kotlin AST debugging utility
     remembrall-server/              # MCP server + CLI binary
       src/
-        lib.rs                  # 9 MCP tools (store, recall, update, delete,
-                                #   ingest_github, ingest_docs, impact, lookup, index)
+        lib.rs                  # MCP server struct + tool registration; thin #[tool] wrappers
+                                #   that delegate to *_impl() functions in tools/
         main.rs                 # CLI entry point (init, serve, start, stop, status, doctor, reset, version)
         config.rs               # RemembrallConfig - loads ~/.remembrall/config.toml with env var overrides
+        watcher.rs              # Live file watcher for auto-reindexing
+        tools/
+          mod.rs                # Module re-exports
+          memory.rs             # store, recall, update, delete implementations
+          graph.rs              # index, impact, lookup_symbol implementations
+          ingest.rs             # ingest_github, ingest_docs implementations
     remembrall-python/              # PyO3 bindings (deferred until PyO3 supports Python 3.14)
       src/lib.rs
     remembrall-test-harness/        # Parser quality testing
@@ -154,7 +166,7 @@ Code relationship graph stored as Postgres adjacency tables.
 
 **Tables:**
 - `remembrall.symbols` - code symbols (File, Function, Class, Method) with file path, line numbers, language, project
-- `remembrall.relationships` - edges between symbols (Calls, Imports, Defines, Inherits) with confidence scores
+- `remembrall.relationships` - edges between symbols (Calls, Imports, Defines, Inherits, UsesType) with confidence scores
 
 **Key operations:**
 - `upsert_symbol(symbol)` - insert or update a symbol
@@ -162,6 +174,10 @@ Code relationship graph stored as Postgres adjacency tables.
 - `impact_analysis(symbol_id, direction, max_depth)` - recursive CTE traversal
 - `find_symbol(name, type)` - lookup by name
 - `remove_file(path, project)` - cascade delete for reindexing
+
+**Relationship types (5):** `Calls`, `Imports`, `Defines`, `Inherits`, `UsesType`
+
+`UsesType` edges are created when a symbol references another type in a parameter annotation, return type, or (for Python) a string forward reference. Supported in Python, TypeScript, Rust, Java, Go, and Kotlin. Ruby is skipped because it is dynamically typed.
 
 **Impact analysis** uses recursive CTEs with cycle detection. Traverses upstream (who calls me?), downstream (what do I call?), or both. Confidence decays multiplicatively through the chain.
 
@@ -173,7 +189,7 @@ Tree-sitter based source code analysis. Pure Rust, no Python involved.
 
 **What it extracts:**
 - Symbols: functions, classes, methods, files
-- Relationships: function calls, imports, class inheritance, method definitions
+- Relationships: function calls, imports, class inheritance, method definitions, type annotations
 - Metadata: signatures, line numbers, decorators
 
 **Two-phase resolution (`walker.rs`):**
@@ -198,11 +214,15 @@ Incremental code indexing with mtime tracking.
 
 **`CodeParser` trait** - plug-in interface so the indexer doesn't own parsing logic. Any language can be added by implementing `parse(file_path, source, language)`.
 
+**`supported_extensions()`** - public function in `indexer.rs` that is the single source of truth for all supported file extensions. The file walker uses it directly, so adding a new extension here automatically enables indexing for that type. Currently 13 extensions across 8 languages: `py`, `ts`, `tsx`, `js`, `jsx`, `mjs`, `cjs`, `rs`, `go`, `rb`, `java`, `kt`, `kts`.
+
 ---
 
 ## Ingestion Pipeline
 
 Two tools solve the cold-start problem - getting useful memories into a fresh RemembrallMCP instance without manually running `remembrall_store` for every piece of knowledge.
+
+The core ingestion logic lives in `remembrall-core/src/ingest.rs` and is called by thin wrapper functions in `remembrall-server/src/tools/ingest.rs`. This means the same logic is available to any frontend (MCP server, CLI, HTTP API) without duplication.
 
 ### GitHub PR Ingestion (`remembrall_ingest_github`)
 
@@ -251,6 +271,16 @@ Each memory has an `access_count` that increments on `get()`. The `get_readonly(
 The MCP server exposes RemembrallMCP's capabilities to any MCP-compatible agent (Claude Code, Cursor, etc.) over stdio transport.
 
 **Binary:** `target/release/remembrall` (includes ONNX Runtime for embeddings)
+
+### Tools Module Structure
+
+The 9 tools are split across three modules under `remembrall-server/src/tools/`. `lib.rs` contains the MCP server struct with thin `#[tool]` wrapper methods that resolve optional parameters and then delegate to `*_impl()` functions in the appropriate module:
+
+| Module | Tools |
+|--------|-------|
+| `tools/memory.rs` | store, recall, update, delete |
+| `tools/graph.rs` | index, impact, lookup_symbol |
+| `tools/ingest.rs` | ingest_github, ingest_docs |
 
 ### Tools
 
@@ -364,7 +394,7 @@ model = "all-MiniLM-L6-v2"
 |-------|---------|-------------|
 | `memories` | Text knowledge with embeddings | HNSW (vector), GIN (full-text, tags), B-tree (scope) |
 | `symbols` | Code symbols (functions, classes, etc.) | B-tree (file_path, name+type) |
-| `relationships` | Edges between symbols | B-tree (source_id, target_id) |
+| `relationships` | Edges between symbols (5 types: Calls, Imports, Defines, Inherits, UsesType) | B-tree (source_id, target_id) |
 | `file_index` | Mtime tracking for incremental indexing | PK (file_path, project) |
 
 ---
@@ -375,7 +405,14 @@ model = "all-MiniLM-L6-v2"
 - Rust 1.94+
 - Docker (for local Postgres + pgvector, or bring your own Postgres)
 
-### First-time setup
+### Docker (one command)
+```bash
+docker compose up
+```
+
+This starts both the Postgres/pgvector container and the remembrall server. The `Dockerfile` builds the release binary with the embedded ONNX Runtime; `docker-compose.yml` wires it to the database.
+
+### First-time setup (local build)
 ```bash
 cargo build -p remembrall-server --release
 ./target/release/remembrall init
@@ -441,11 +478,15 @@ Real questions answered correctly against real codebases:
 |------|--------|-------------|
 | MCP server - core tools | Done | store, recall, update, delete over stdio |
 | Hybrid recall | Done | RRF fusion of semantic + full-text search |
-| Ingestion pipeline | Done | GitHub PR ingestion + markdown doc ingestion |
+| Ingestion pipeline | Done | GitHub PR ingestion + markdown doc ingestion; core logic in remembrall-core/src/ingest.rs |
 | Memory features | Done | Contradiction detection, access tracking, partial update |
 | CLI | Done | init, serve, start, stop, status, doctor, reset, version |
 | Config file | Done | `~/.remembrall/config.toml` with env var overrides |
 | Code graph tools | Done | impact, lookup_symbol, index - all 8 languages |
+| Tools module split | Done | memory/graph/ingest modules with thin wrappers in lib.rs |
+| UsesType relationship | Done | Type annotation tracking in Python, TS, Rust, Java, Go, Kotlin |
+| Docker support | Done | Dockerfile + docker-compose.yml for one-command setup |
+| Benchmarks | Done | A/B benchmark harness in benchmarks/ |
 | Prebuilt binaries | In progress | macOS ARM64 binary exists in `dist/` - CI release pipeline pending |
 | Concurrent load test | TODO | 50 simulated agents hitting the engine |
 | Incremental indexing via MCP | TODO | Wire the Indexer mtime tracking into remembrall_index |
