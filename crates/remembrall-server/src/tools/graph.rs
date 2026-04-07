@@ -88,6 +88,11 @@ pub async fn index_impl(
     .map_err(|e| McpError::internal_error(format!("index_directory failed: {e}"), None))?;
 
     graph_arc
+        .remove_project(&project)
+        .await
+        .map_err(|e| McpError::internal_error(format!("remove_project failed: {e}"), None))?;
+
+    graph_arc
         .upsert_symbols_batch(&index_result.symbols)
         .await
         .map_err(|e| McpError::internal_error(format!("upsert_symbols_batch failed: {e}"), None))?;

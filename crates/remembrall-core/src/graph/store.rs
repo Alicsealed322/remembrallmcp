@@ -665,6 +665,19 @@ impl GraphStore {
 
         Ok(result.rows_affected())
     }
+
+    /// Remove all symbols and relationships for a given project before a full re-index.
+    pub async fn remove_project(&self, project: &str) -> Result<u64> {
+        let result = sqlx::query(&format!(
+            "DELETE FROM {schema}.symbols WHERE project = $1",
+            schema = self.schema,
+        ))
+        .bind(project)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
 }
 
 #[derive(sqlx::FromRow)]
