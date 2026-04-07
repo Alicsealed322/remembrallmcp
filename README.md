@@ -43,7 +43,10 @@ This is the difference between an agent that explores your codebase every time a
 
 ### Benchmarks
 
-Tested on [pallets/click](https://github.com/pallets/click) v8.1.7 (594 symbols, 1,589 relationships). Five identical coding tasks run with and without RemembrallMCP. [Full report](benchmarks/reports/benchmark-2026-04-02.md).
+RemembrallMCP is currently benchmarked on two surfaces:
+
+- **Agent productivity on code tasks** - Tested on [pallets/click](https://github.com/pallets/click) v8.1.7 (594 symbols, 1,589 relationships). Five identical coding tasks run with and without RemembrallMCP. [Full report](benchmarks/reports/benchmark-2026-04-02.md).
+- **Memory recall quality** - Local recall harness run against 31 ground-truth queries covering search quality, filtering, edge cases, ranking, and latency.
 
 | Metric | Without RemembrallMCP | With RemembrallMCP | Delta |
 |--------|----------------------|---------------------|-------|
@@ -52,6 +55,14 @@ Tested on [pallets/click](https://github.com/pallets/click) v8.1.7 (594 symbols,
 | Avg tool calls per question | 22.4 | 1.0 | **-95.5%** |
 
 The savings compound on larger codebases. Click is ~90 files - on a 500+ file monorepo, agents without RemembrallMCP need proportionally more exploration calls, while graph queries stay under 10ms regardless of size.
+
+| Memory Recall Metric | Result |
+|---|---|
+| Queries passed | **31 / 31** |
+| Recall@5 | **0.917** |
+| Precision@5 | **0.619** |
+| MRR | **0.908** |
+| p95 latency | **14ms** |
 
 Run the benchmarks yourself: see [`benchmarks/`](benchmarks/) for the harness and task definitions.
 
