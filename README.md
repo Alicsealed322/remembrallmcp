@@ -109,6 +109,54 @@ remembrall init
 
 ### Connect to your MCP client
 
+#### Codex
+
+Codex uses the same MCP server definition format. Register the server as `remembrall` and point it at either the installed binary or your local release build.
+
+**If `remembrall` is installed in `PATH`:**
+
+```json
+{
+  "mcpServers": {
+    "remembrall": {
+      "command": "remembrall"
+    }
+  }
+}
+```
+
+**If running from a local source checkout:**
+
+```json
+{
+  "mcpServers": {
+    "remembrall": {
+      "command": "/path/to/remembrallmcp/target/release/remembrall",
+      "env": {
+        "DATABASE_URL": "postgres://postgres:postgres@localhost:5450/remembrall"
+      }
+    }
+  }
+}
+```
+
+**If using Docker Compose from Codex:**
+
+```json
+{
+  "mcpServers": {
+    "remembrall": {
+      "command": "docker",
+      "args": ["compose", "-f", "/path/to/remembrallmcp/docker-compose.yml", "run", "--rm", "-T", "remembrall"]
+    }
+  }
+}
+```
+
+Restart Codex after adding the server so it reconnects and loads the tools.
+
+#### Claude Code, Cursor, and other MCP clients
+
 Add to your project's `.mcp.json` (works with Claude Code, Cursor, and any MCP-compatible client).
 
 **If using a prebuilt binary or built from source:**
