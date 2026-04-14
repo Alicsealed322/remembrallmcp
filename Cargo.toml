@@ -7,6 +7,11 @@ resolver = "3"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+description = "Persistent knowledge memory layer for AI agents - Rust, Postgres, pgvector"
+keywords = ["mcp", "ai", "memory", "knowledge-graph", "pgvector"]
+categories = ["development-tools", "database"]
+homepage = "https://roboticforce.io/remembrall"
+repository = "https://github.com/cdnsteve/remembrallmcp"
 
 [workspace.dependencies]
 tokio = { version = "=1.50.0", features = ["full"] }
